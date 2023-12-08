@@ -22,8 +22,15 @@
     && builtins.hasAttr "git" grammar.source
     && builtins.hasAttr "rev" grammar.source;
   isGitHubGrammar = grammar: lib.hasPrefix "https://github.com" grammar.source.git;
+  isSourceHutGrammar = grammar: lib.hasPrefix "https://git.sr.ht" grammar.source.git;
   toGitHubFetcher = url: let
     match = builtins.match "https://github\.com/([^/]*)/([^/]*)/?" url;
+  in {
+    owner = builtins.elemAt match 0;
+    repo = builtins.elemAt match 1;
+  };
+  toSourceHutFetcher = url: let
+    match = builtins.match "https://git\.sr\.ht/([^/]*)/([^/]*)/?" url;
   in {
     owner = builtins.elemAt match 0;
     repo = builtins.elemAt match 1;
@@ -31,6 +38,7 @@
   gitGrammars = builtins.filter isGitGrammar languagesConfig.grammar;
   buildGrammar = grammar: let
     gh = toGitHubFetcher grammar.source.git;
+    srht = toSourceHutFetcher grammar.source.git;
     sourceGit = builtins.fetchTree {
       type = "git";
       url = grammar.source.git;
@@ -44,9 +52,17 @@
       repo = gh.repo;
       inherit (grammar.source) rev;
     };
+    sourceSrHt = builtins.fetchTree {
+      type = "sourcehut";
+      owner = srht.owner;
+      repo = srht.repo;
+      inherit (grammar.source) rev;
+    };
     source =
       if isGitHubGrammar grammar
       then sourceGitHub
+      else if isSourceHutGrammar grammar
+      then sourceSrHt
       else sourceGit;
   in
     stdenv.mkDerivation {
